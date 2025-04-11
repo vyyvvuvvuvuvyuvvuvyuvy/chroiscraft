@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chroiscraft</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #000;
+      font-family: Arial, sans-serif;
+    }
+
+    /* Health and Hunger Bars */
+    .bar {
+      width: 200px;
+      height: 20px;
+      border: 2px solid #fff;
+      background-color: #333;
+      margin: 10px;
+    }
+
+    .fill {
+      height: 100%;
+      background-color: red;
+      width: 100%;
+    }
+
+    /* Inventory */
+    #inventory {
+      display: flex;
+      gap: 10px;
+      margin: 10px;
+    }
+
+    .slot {
+      width: 50px;
+      height: 50px;
+      border: 1px solid #fff;
+      background-color: #333;
+      color: white;
+      text-align: center;
+      line-height: 50px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Health and Hunger Bars -->
+  <div id="health-bar" class="bar">
+    <div id="health-fill" class="fill"></div>
+  </div>
+  <div id="hunger-bar" class="bar">
+    <div id="hunger-fill" class="fill"></div>
+  </div>
+
+  <!-- Inventory -->
+  <div id="inventory">
+    <div class="slot" id="slot1">Slot 1</div>
+    <div class="slot" id="slot2">Slot 2</div>
+    <!-- More slots can be added here -->
+  </div>
+
+  <!-- Canvas for the game world -->
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+  <script>
+    // Game Settings
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Health and Hunger Values
+    let health = 100;
+    let hunger = 100;
+
+    // Mobs (Entities)
+    class Entity {
+      constructor(type, health, position) {
+        this.type = type;
+        this.health = health;
+        this.position = position;
+        this.size = 30;
+      }
+
+      // Move the entity
+      move() {
+        // Example of basic movement logic
+        this.position.x += (Math.random() - 0.5) * 2;
+        this.position.y += (Math.random() - 0.5) * 2;
+      }
+
+      // Render the mob
+      render() {
+        ctx.fillStyle = this.type === 'zombie' ? 'green' : 'brown';
+        ctx.fillRect(this.position.x, this.position.y, this.size, this.size);
+      }
+    }
+
+    // Entities - Hostile and Friendly Mobs
+    const hostileMobs = [new Entity('zombie', 20, { x: 100, y: 100 })];
+    const friendlyMobs = [new Entity('cow', 10, { x: 300, y: 300 })];
+
+    // Blocks (Sand, Water, Wood)
+    class Block {
+      constructor(type, texture) {
+        this.type = type;
+        this.texture = texture;
+        this.isCollidable = true;
+      }
+
+      render(x, y) {
+        ctx.fillStyle = this.type === 'sand' ? 'yellow' : this.type === 'water' ? 'blue' : 'brown';
+        ctx.fillRect(x * 50, y * 50, 50, 50);
+      }
+    }
+
+    const blocks = {
+      dirt: new Block('dirt', 'textures/dirt.png'),
+      sand: new Block('sand', 'textures/sand.png'),
+      wood: new Block('wood', 'textures/wood.png'),
+      water: new Block('water', 'textures/water.png'),
+    };
+
+    // World Generation
+    const worldWidth = 16;
+    const worldHeight = 12;
+    let world = [];
+
+    function generateWorld() {
+      for (let x = 0; x < worldWidth; x++) {
+        world[x] = [];
+        for (let y = 0; y < worldHeight; y++) {
+          if (y === 0) {
+            world[x][y] = blocks.sand;
+          } else if (y > 0 && y < 4) {
+            world[x][y] = blocks.dirt;
+          } else {
+            world[x][y] = blocks.water;
+          }
+        }
+      }
+    }
+
+    // Inventory System
+    let inventory = ['wood', 'sand'];
+
+    function renderInventory() {
+      const inventoryContainer = document.getElementById('inventory');
+      inventoryContainer.innerHTML = '';
+      inventory.forEach((item, index) => {
+        const slot = document.createElement('div');
+        slot.classList.add('slot');
+        slot.textContent = item;
+        inventoryContainer.appendChild(slot);
+      });
+    }
+
+    // Update Health Bar
+    function updateHealthBar() {
+      const healthBar = document.getElementById('health-fill');
+      healthBar.style.width = `${health}%`;
+    }
+
+    // Update Hunger Bar
+    function updateHungerBar() {
+      const hungerBar = document.getElementById('hunger-fill');
+      hungerBar.style.width = `${hunger}%`;
+    }
+
+    // Game Update Logic
+    function update() {
+      // Decrease hunger over time
+      hunger -= 0.1;
+      if (hunger <= 0) {
+        health -= 0.5;  // Health decreases when hunger is low
+      }
+
+      // Update Health and Hunger
+      updateHealthBar();
+      updateHungerBar();
+
+      // Move mobs
+      hostileMobs.forEach(mob => mob.move());
+      friendlyMobs.forEach(mob => mob.move());
+
+      // Render the world
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let x = 0; x < worldWidth; x++) {
+        for (let y = 0; y < worldHeight; y++) {
+          world[x][y].render(x, y);
+        }
+      }
+
+      // Render mobs
+      hostileMobs.forEach(mob => mob.render());
+      friendlyMobs.forEach(mob => mob.render());
+
+      // Render inventory
+      renderInventory();
+
+      // Continue the game loop
+      requestAnimationFrame(update);
+    }
+
+    // Start the game
+    generateWorld();
+    update();
+  </script>
+</body>
+</html>
