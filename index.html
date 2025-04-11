@@ -34,7 +34,7 @@
 <body>
   <div id="menu">
     <h1>Chroiscraft</h1>
-    <button onclick="startGame()">New Game</button>
+    <button id="startBtn">New Game</button>
   </div>
   <canvas id="glcanvas"></canvas>
   <script type="module">
@@ -71,6 +71,8 @@
       gameStarted = true;
       lockMouse();
     }
+
+    document.getElementById("startBtn").addEventListener("click", startGame);
 
     function showMenu() {
       document.getElementById("menu").style.display = "flex";
@@ -116,11 +118,15 @@
     canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
     canvas.addEventListener("mousedown", (e) => {
-      if (e.button === 2) {
-        const dir = getDirectionVector();
-        const x = Math.floor(player.x + dir.x * 3);
-        const y = Math.floor(player.y + dir.y * 3);
-        const z = Math.floor(player.z + dir.z * 3);
+      const dir = getDirectionVector();
+      const x = Math.floor(player.x + dir.x * 3);
+      const y = Math.floor(player.y + dir.y * 3);
+      const z = Math.floor(player.z + dir.z * 3);
+      if (e.button === 0) {
+        // Left-click to remove block
+        blocks = blocks.filter(b => !(b.x === x && b.y === y && b.z === z));
+      } else if (e.button === 2) {
+        // Right-click to place block
         blocks.push({ x, y, z, type: blockType });
       }
     });
