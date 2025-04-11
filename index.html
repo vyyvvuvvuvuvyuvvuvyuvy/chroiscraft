@@ -11,7 +11,6 @@
 </head>
 <body>
   <script type="module">
-    // Basic Three.js + WebGL setup for Chroiscraft
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.module.js';
     import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/controls/OrbitControls.js';
 
@@ -31,7 +30,7 @@
 
     const textureLoader = new THREE.TextureLoader();
     const textures = {
-      stone: textureLoader.load('blob:chrome-untrusted://media-app/a56eaf18-3c2a-4ef5-b597-42ff765b403c'),
+       stone: textureLoader.load('blob:chrome-untrusted://media-app/a56eaf18-3c2a-4ef5-b597-42ff765b403c'),
       coal: textureLoader.load('blob:chrome-untrusted://media-app/5cea07b6-cab2-4a8f-9e7d-223814108e56'),
       iron: textureLoader.load('blob:chrome-untrusted://media-app/20a33b4f-8619-430b-b3b0-4a19d83b4202'),
       diamond: textureLoader.load('blob:chrome-untrusted://media-app/31cc671b-0b82-47a5-ac69-727c9a4a9f0f'),
@@ -52,12 +51,12 @@
     function generateChunk(xOffset, zOffset) {
       for (let x = 0; x < 16; x++) {
         for (let z = 0; z < 16; z++) {
-          let topY = 15;
-          for (let y = 0; y <= topY; y++) {
+          let height = Math.floor(Math.random() * 5 + 10); // Terrain variation
+          for (let y = 0; y <= height; y++) {
             const worldX = x + xOffset;
             const worldZ = z + zOffset;
             let type = 'stone';
-            if (y === topY) {
+            if (y === height) {
               type = 'grass';
             } else if (y < 4 && Math.random() < 0.02) {
               type = 'diamond';
@@ -72,12 +71,20 @@
       }
     }
 
+    function generateWorld(radius = 2) {
+      for (let i = -radius; i <= radius; i++) {
+        for (let j = -radius; j <= radius; j++) {
+          generateChunk(i * 16, j * 16);
+        }
+      }
+    }
+
     const light = new THREE.DirectionalLight(0xffffff, 1);
     light.position.set(100, 100, 100);
     scene.add(light);
 
     const entities = {
-      friendly: [blob:chrome-untrusted://media-app/0b8a77da-48c2-4715-a80a-ca5035c0039e],
+ friendly: [blob:chrome-untrusted://media-app/0b8a77da-48c2-4715-a80a-ca5035c0039e],
       hostile: [blob:chrome-untrusted://media-app/77db7fdb-33fc-4c74-b8cf-8c6573816781]
     };
 
@@ -110,7 +117,7 @@
       }
     });
 
-    generateChunk(0, 0);
+    generateWorld();
 
     function gameLoop() {
       controls.update();
