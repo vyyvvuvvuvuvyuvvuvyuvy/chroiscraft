@@ -1,131 +1,197 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chroiscraft</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chroiscraft - WebGL Creative</title>
   <style>
-    body { margin: 0; overflow: hidden; }
+    html, body {
+      margin: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+      background: #000;
+    }
     canvas { display: block; }
+    #menu {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #222;
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      z-index: 10;
+    }
+    #menu button {
+      padding: 10px 20px;
+      font-size: 20px;
+      margin-top: 10px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
+  <div id="menu">
+    <h1>Chroiscraft</h1>
+    <button onclick="startGame()">New Game</button>
+  </div>
+  <canvas id="glcanvas"></canvas>
   <script type="module">
-    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.module.js';
-    import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/controls/OrbitControls.js';
+    import initRenderer from './rendering.js';
 
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87ceeb); // Sky blue
+    const canvas = document.getElementById("glcanvas");
+    const gl = canvas.getContext("webgl");
+    if (!gl) alert("WebGL not supported");
 
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 50, 100);
-
-    const renderer = new THREE.WebGLRenderer();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
-
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(0, 0, 0);
-    controls.update();
-
-    const textureLoader = new THREE.TextureLoader();
-    const textures = {
-       stone: textureLoader.load('blob:chrome-untrusted://media-app/a56eaf18-3c2a-4ef5-b597-42ff765b403c'),
-      coal: textureLoader.load('blob:chrome-untrusted://media-app/5cea07b6-cab2-4a8f-9e7d-223814108e56'),
-      iron: textureLoader.load('blob:chrome-untrusted://media-app/20a33b4f-8619-430b-b3b0-4a19d83b4202'),
-      diamond: textureLoader.load('blob:chrome-untrusted://media-app/31cc671b-0b82-47a5-ac69-727c9a4a9f0f'),
-      grass: textureLoader.load('blob:chrome-untrusted://media-app/bcc3e8a9-be87-4720-8412-d83391976ed5')
+    let menuVisible = true;
+    let gameStarted = false;
+    let mouseLocked = false;
+    let keys = {};
+    let blockType = 1;
+    let blocks = [];
+    let player = {
+      x: 0, y: 1.8, z: 0,
+      pitch: 0, yaw: 0,
+      speed: 0.1
     };
 
-    const blockSize = 1;
+    const BLOCK_TYPES = [
+      [0.55, 0.27, 0.07],  // Dirt
+      [0.5, 0.5, 0.5],     // Stone
+      [0.8, 0.52, 0.25],   // Wood
+      [0.13, 0.55, 0.13],  // Grass
+      [0.96, 0.87, 0.7]    // Planks
+    ];
 
-    function createBlock(x, y, z, type) {
-      const geometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
-      const material = new THREE.MeshStandardMaterial({ map: textures[type] });
-      const block = new THREE.Mesh(geometry, material);
-      block.position.set(x, y, z);
-      scene.add(block);
-      return block;
+    const drawBlock = initRenderer(gl);
+
+    function startGame() {
+      document.getElementById("menu").style.display = "none";
+      gameStarted = true;
+      lockMouse();
     }
 
-    function generateChunk(xOffset, zOffset) {
-      for (let x = 0; x < 16; x++) {
-        for (let z = 0; z < 16; z++) {
-          let height = Math.floor(Math.random() * 5 + 10); // Terrain variation
-          for (let y = 0; y <= height; y++) {
-            const worldX = x + xOffset;
-            const worldZ = z + zOffset;
-            let type = 'stone';
-            if (y === height) {
-              type = 'grass';
-            } else if (y < 4 && Math.random() < 0.02) {
-              type = 'diamond';
-            } else if (y < 8 && Math.random() < 0.1) {
-              type = 'iron';
-            } else if (Math.random() < 0.3) {
-              type = 'coal';
-            }
-            createBlock(worldX, y, worldZ, type);
-          }
-        }
+    function showMenu() {
+      document.getElementById("menu").style.display = "flex";
+      gameStarted = false;
+      unlockMouse();
+    }
+
+    function lockMouse() {
+      if (!mouseLocked) canvas.requestPointerLock();
+    }
+
+    function unlockMouse() {
+      document.exitPointerLock();
+    }
+
+    document.addEventListener("pointerlockchange", () => {
+      mouseLocked = document.pointerLockElement === canvas;
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        if (mouseLocked) unlockMouse();
+        else showMenu();
       }
-    }
-
-    function generateWorld(radius = 2) {
-      for (let i = -radius; i <= radius; i++) {
-        for (let j = -radius; j <= radius; j++) {
-          generateChunk(i * 16, j * 16);
-        }
-      }
-    }
-
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(100, 100, 100);
-    scene.add(light);
-
-    const entities = {
- friendly: [blob:chrome-untrusted://media-app/0b8a77da-48c2-4715-a80a-ca5035c0039e],
-      hostile: [blob:chrome-untrusted://media-app/77db7fdb-33fc-4c74-b8cf-8c6573816781]
-    };
-
-    function spawnEntity(type, x, y, z) {
-      const color = type === 'friendly' ? 0x00ff00 : 0xff0000;
-      const geometry = new THREE.SphereGeometry(0.5, 16, 16);
-      const material = new THREE.MeshStandardMaterial({ color });
-      const entity = new THREE.Mesh(geometry, material);
-      entity.position.set(x, y, z);
-      scene.add(entity);
-      entities[type].push(entity);
-    }
-
-    let craftingMenuVisible = false;
-    const craftingMenu = document.createElement('div');
-    craftingMenu.style.position = 'absolute';
-    craftingMenu.style.top = '20px';
-    craftingMenu.style.left = '20px';
-    craftingMenu.style.padding = '10px';
-    craftingMenu.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-    craftingMenu.style.color = '#fff';
-    craftingMenu.style.display = 'none';
-    craftingMenu.innerHTML = `Press E to open/close this menu<br><br>Pickaxe Recipe: <br>3x Stone (top row)<br>2x Sticks (center of mid and bottom row)`;
-    document.body.appendChild(craftingMenu);
-
-    window.addEventListener('keydown', (e) => {
-      if (e.key.toLowerCase() === 'e') {
-        craftingMenuVisible = !craftingMenuVisible;
-        craftingMenu.style.display = craftingMenuVisible ? 'block' : 'none';
+      keys[e.key.toLowerCase()] = true;
+      if ("12345".includes(e.key)) {
+        blockType = parseInt(e.key);
       }
     });
 
-    generateWorld();
+    document.addEventListener("keyup", (e) => {
+      keys[e.key.toLowerCase()] = false;
+    });
 
-    function gameLoop() {
-      controls.update();
-      renderer.render(scene, camera);
-      requestAnimationFrame(gameLoop);
+    document.addEventListener("mousemove", (e) => {
+      if (mouseLocked) {
+        player.yaw += e.movementX * 0.1;
+        player.pitch -= e.movementY * 0.1;
+        player.pitch = Math.max(-90, Math.min(90, player.pitch));
+      }
+    });
+
+    canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    canvas.addEventListener("mousedown", (e) => {
+      if (e.button === 2) {
+        const dir = getDirectionVector();
+        const x = Math.floor(player.x + dir.x * 3);
+        const y = Math.floor(player.y + dir.y * 3);
+        const z = Math.floor(player.z + dir.z * 3);
+        blocks.push({ x, y, z, type: blockType });
+      }
+    });
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    function getDirectionVector() {
+      const radYaw = player.yaw * Math.PI / 180;
+      const radPitch = player.pitch * Math.PI / 180;
+      return {
+        x: Math.cos(radPitch) * Math.sin(radYaw),
+        y: Math.sin(radPitch),
+        z: Math.cos(radPitch) * Math.cos(radYaw)
+      };
     }
 
-    gameLoop();
+    function updatePlayer() {
+      const dir = getDirectionVector();
+      const right = {
+        x: Math.sin((player.yaw + 90) * Math.PI / 180),
+        z: Math.cos((player.yaw + 90) * Math.PI / 180)
+      };
+      if (keys['w']) {
+        player.x += dir.x * player.speed;
+        player.z += dir.z * player.speed;
+      }
+      if (keys['s']) {
+        player.x -= dir.x * player.speed;
+        player.z -= dir.z * player.speed;
+      }
+      if (keys['a']) {
+        player.x -= right.x * player.speed;
+        player.z -= right.z * player.speed;
+      }
+      if (keys['d']) {
+        player.x += right.x * player.speed;
+        player.z += right.z * player.speed;
+      }
+    }
+
+    function generateWorld() {
+      blocks = [];
+      for (let x = -10; x <= 10; x++) {
+        for (let z = -10; z <= 10; z++) {
+          blocks.push({ x, y: 0, z, type: 4 }); // Grass
+        }
+      }
+    }
+
+    function renderLoop() {
+      if (gameStarted) {
+        updatePlayer();
+
+        gl.clearColor(0.53, 0.81, 0.98, 1.0); // Sky blue
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        blocks.forEach(b => {
+          drawBlock(b.x, b.y, b.z, BLOCK_TYPES[b.type - 1]);
+        });
+      }
+      requestAnimationFrame(renderLoop);
+    }
+
+    generateWorld();
+    renderLoop();
   </script>
 </body>
 </html>
