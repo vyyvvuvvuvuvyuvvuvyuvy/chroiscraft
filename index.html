@@ -1,207 +1,160 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chroiscraft 3D</title>
-  <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      background-color: #87CEEB;
-    }
-
-    /* Health and Hunger Bars */
-    .bar {
-      position: absolute;
-      top: 10px;
-      width: 200px;
-      height: 20px;
-      border: 2px solid #fff;
-      background-color: #333;
-      margin: 10px;
-    }
-
-    .fill {
-      height: 100%;
-      background-color: red;
-      width: 100%;
-    }
-
-    /* Inventory */
-    #inventory {
-      position: absolute;
-      top: 40px;
-      left: 10px;
-      display: flex;
-      gap: 10px;
-    }
-
-    .slot {
-      width: 50px;
-      height: 50px;
-      border: 1px solid #fff;
-      background-color: #333;
-      color: white;
-      text-align: center;
-      line-height: 50px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Minecraft-like Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
 </head>
 <body>
-  <!-- Health and Hunger Bars -->
-  <div id="health-bar" class="bar">
-    <div id="health-fill" class="fill"></div>
-  </div>
-  <div id="hunger-bar" class="bar" style="top: 40px;">
-    <div id="hunger-fill" class="fill"></div>
-  </div>
+    <script>
+        // Scene, camera, renderer setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
 
-  <!-- Inventory -->
-  <div id="inventory">
-    <div class="slot" id="slot1">Wood</div>
-    <div class="slot" id="slot2">Sand</div>
-  </div>
+        // Texture loader
+        const loader = new THREE.TextureLoader();
+        // Replace these links with your own hosted texture URLs
+        const textureGrass = loader.load('blob:chrome-untrusted://media-app/41a8c8bb-b9d4-4da5-b9c5-64b43640113a');  // Replace with actual texture URL
+        const textureWood = loader.load('blob:chrome-untrusted://media-app/137e8fea-491c-4768-944a-a42af5aeaae1');    // Replace with actual texture URL
+        const textureSand = loader.load('blob:chrome-untrusted://media-app/9651c552-ee90-40a4-ab1f-a7a679863d41');    // Replace with actual texture URL
 
-  <!-- Three.js Scene -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script>
-    let scene, camera, renderer, light;
-    let health = 100, hunger = 100;
-    let inventory = ['wood', 'sand'];
-    let player, worldHeightMap = [];
+        // Chunk size and load distance
+        const chunkSize = 16;
+        const loadDistance = 3;
+        let loadedChunks = [];
 
-    // Initialize Three.js Scene
-    function init() {
-      scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-      renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      document.body.appendChild(renderer.domElement);
+        // Camera position setup
+        camera.position.set(0, 50, 100);
+        camera.lookAt(0, 0, 0);
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
 
-      // Add a directional light with shadows
-      light = new THREE.DirectionalLight(0xffffff, 1);
-      light.position.set(5, 5, 5);
-      light.castShadow = true;
-      scene.add(light);
-      
-      // Create ground and world generation
-      generateWorld();
+        // Utility function to generate chunk based on coordinates
+        function generateChunk(x, z) {
+            const chunk = new THREE.Group();
 
-      // Player (simple cube)
-      player = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshLambertMaterial({ color: 0x0000ff }));
-      player.position.y = 1;
-      player.castShadow = true;
-      scene.add(player);
+            for (let i = 0; i < chunkSize; i++) {
+                for (let j = 0; j < chunkSize; j++) {
+                    const worldX = i + x * chunkSize;
+                    const worldZ = j + z * chunkSize;
+                    const height = Math.sin(worldX * 0.1) * Math.cos(worldZ * 0.1) * 10; // Example terrain height function
 
-      camera.position.z = 5;
-      camera.position.y = 2;
+                    const block = createBlockWithLOD(worldX, height, worldZ);
+                    chunk.add(block);
+                }
+            }
 
-      window.addEventListener('resize', onWindowResize, false);
-
-      animate();
-    }
-
-    // Resize the canvas when the window is resized
-    function onWindowResize() {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    }
-
-    // Generate the world using Perlin noise
-    function generateWorld() {
-      const size = 50;
-      const scale = 2;
-      const noise = new SimplexNoise(); // Or use another noise function if you prefer
-      
-      for (let x = -size / 2; x < size / 2; x++) {
-        worldHeightMap[x] = [];
-        for (let z = -size / 2; z < size / 2; z++) {
-          const height = Math.floor(noise.noise2D(x / scale, z / scale) * 5); // Random terrain height
-          worldHeightMap[x][z] = height;
-          addBlock(x, height, z, 'sand');
+            return chunk;
         }
-      }
-    }
 
-    // Add a block to the world
-    function addBlock(x, y, z, type) {
-      let material;
-      if (type === 'sand') material = new THREE.MeshLambertMaterial({ color: 0xFFD700 });
-      else if (type === 'wood') material = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
-      else if (type === 'water') material = new THREE.MeshLambertMaterial({ color: 0x1E90FF });
+        // Create block with LOD
+        function createBlockWithLOD(x, y, z) {
+            const lowDetail = new THREE.BoxGeometry(1, 1, 1);  // Basic box for far distances
+            const highDetail = new THREE.CylinderGeometry(1, 1, 1, 6);  // More detailed model for nearby
 
-      const geometry = new THREE.BoxGeometry(1, 1, 1);
-      const block = new THREE.Mesh(geometry, material);
-      block.position.set(x, y, z);
-      block.castShadow = true;
-      block.receiveShadow = true;
-      scene.add(block);
-    }
+            const lowMaterial = new THREE.MeshBasicMaterial({ map: textureGrass });
+            const highMaterial = new THREE.MeshBasicMaterial({ map: textureWood });
 
-    // Add an entity (mob) with AI
-    function addEntity(x, y, z, type) {
-      let material = new THREE.MeshLambertMaterial({ color: type === 'hostile' ? 0xFF0000 : 0x00FF00 });
-      const geometry = new THREE.BoxGeometry(1, 1, 1);
-      const entity = new THREE.Mesh(geometry, material);
-      entity.position.set(x, y, z);
-      entity.castShadow = true;
-      scene.add(entity);
+            const lowBlock = new THREE.Mesh(lowDetail, lowMaterial);
+            const highBlock = new THREE.Mesh(highDetail, highMaterial);
 
-      if (type === 'hostile') {
-        // AI to chase player
-        entity.behavior = 'hostile';
-        entity.move = function() {
-          if (this.position.distanceTo(player.position) < 5) {
-            this.lookAt(player.position);
-            this.position.x += Math.sign(player.position.x - this.position.x) * 0.1;
-            this.position.z += Math.sign(player.position.z - this.position.z) * 0.1;
-          }
-        };
-      } else {
-        // Friendly mob AI (wandering randomly)
-        entity.behavior = 'friendly';
-        entity.move = function() {
-          this.position.x += Math.random() * 0.1 - 0.05;
-          this.position.z += Math.random() * 0.1 - 0.05;
-        };
-      }
-    }
+            const lod = new THREE.LOD();
+            lod.addLevel(lowBlock, 100);   // Low detail at 100 units away
+            lod.addLevel(highBlock, 30);   // High detail at 30 units away
 
-    // Update Health and Hunger Bars
-    function updateBars() {
-      document.getElementById('health-fill').style.width = `${health}%`;
-      document.getElementById('hunger-fill').style.width = `${hunger}%`;
-    }
-
-    // Game Loop
-    function animate() {
-      requestAnimationFrame(animate);
-
-      // Update health and hunger
-      hunger -= 0.1;
-      if (hunger <= 0) {
-        health -= 0.5;
-      }
-
-      // Update AI behaviors
-      scene.traverse(function(child) {
-        if (child.move) {
-          child.move();
+            lod.position.set(x, y, z);
+            return lod;
         }
-      });
 
-      // Update health and hunger bars
-      updateBars();
+        // Chunk Management - Load and Unload Chunks Dynamically
+        function distanceBetween(x1, z1, x2, z2) {
+            return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(z2 - z1, 2));
+        }
 
-      // Render the scene
-      renderer.render(scene, camera);
-    }
+        function getChunkCoordinates(playerX, playerZ) {
+            return { x: Math.floor(playerX / chunkSize), z: Math.floor(playerZ / chunkSize) };
+        }
 
-    // Initialize the game
-    init();
+        function loadChunk(x, z) {
+            const chunk = generateChunk(x, z);
+            loadedChunks.push({ chunk, x, z });
+            scene.add(chunk);  // Add chunk to the scene
+        }
 
-  </script>
+        function unloadChunk(x, z) {
+            const chunkIndex = loadedChunks.findIndex(chunkData => chunkData.x === x && chunkData.z === z);
+            if (chunkIndex !== -1) {
+                const chunk = loadedChunks[chunkIndex].chunk;
+                scene.remove(chunk);  // Remove chunk from the scene
+                loadedChunks.splice(chunkIndex, 1);  // Remove from loaded chunks
+            }
+        }
+
+        function updateChunks(playerX, playerZ) {
+            const { x, z } = getChunkCoordinates(playerX, playerZ);
+
+            // Load new chunks
+            for (let dx = -loadDistance; dx <= loadDistance; dx++) {
+                for (let dz = -loadDistance; dz <= loadDistance; dz++) {
+                    const chunkX = x + dx;
+                    const chunkZ = z + dz;
+
+                    if (!loadedChunks.some(chunkData => chunkData.x === chunkX && chunkData.z === chunkZ)) {
+                        loadChunk(chunkX, chunkZ);
+                    }
+                }
+            }
+
+            // Unload distant chunks
+            loadedChunks.forEach(chunkData => {
+                const distance = distanceBetween(chunkData.x, chunkData.z, x, z);
+                if (distance > loadDistance) {
+                    unloadChunk(chunkData.x, chunkData.z);
+                }
+            });
+        }
+
+        // Movement Controls (WASD)
+        const moveSpeed = 1;
+        let keys = {};
+
+        window.addEventListener("keydown", (event) => {
+            keys[event.key] = true;
+        });
+
+        window.addEventListener("keyup", (event) => {
+            keys[event.key] = false;
+        });
+
+        function updateCameraPosition() {
+            if (keys['w']) camera.position.z -= moveSpeed;
+            if (keys['s']) camera.position.z += moveSpeed;
+            if (keys['a']) camera.position.x -= moveSpeed;
+            if (keys['d']) camera.position.x += moveSpeed;
+        }
+
+        // Game loop
+        let playerPosition = { x: 0, y: 50, z: 0 };
+        function gameLoop() {
+            updateCameraPosition();
+            updateChunks(playerPosition.x, playerPosition.z);  // Update chunks based on player position
+
+            renderer.render(scene, camera);
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start the game loop
+        gameLoop();
+
+    </script>
 </body>
 </html>
+
