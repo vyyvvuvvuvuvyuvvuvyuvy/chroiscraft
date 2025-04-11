@@ -1,160 +1,124 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Minecraft-like Game</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <style>
-        body { margin: 0; overflow: hidden; }
-        canvas { display: block; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chroiscraft</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+  </style>
 </head>
 <body>
-    <script>
-        // Scene, camera, renderer setup
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+  <script type="module">
+    // Basic Three.js + WebGL setup for Chroiscraft
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.module.js';
+    import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/controls/OrbitControls.js';
 
-        // Texture loader
-        const loader = new THREE.TextureLoader();
-        // Replace these links with your own hosted texture URLs
-        const textureGrass = loader.load('blob:chrome-untrusted://media-app/41a8c8bb-b9d4-4da5-b9c5-64b43640113a');  // Replace with actual texture URL
-        const textureWood = loader.load('blob:chrome-untrusted://media-app/137e8fea-491c-4768-944a-a42af5aeaae1');    // Replace with actual texture URL
-        const textureSand = loader.load('blob:chrome-untrusted://media-app/9651c552-ee90-40a4-ab1f-a7a679863d41');    // Replace with actual texture URL
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb); // Sky blue
 
-        // Chunk size and load distance
-        const chunkSize = 16;
-        const loadDistance = 3;
-        let loadedChunks = [];
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 50, 100);
 
-        // Camera position setup
-        camera.position.set(0, 50, 100);
-        camera.lookAt(0, 0, 0);
-        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
 
-        // Utility function to generate chunk based on coordinates
-        function generateChunk(x, z) {
-            const chunk = new THREE.Group();
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 0, 0);
+    controls.update();
 
-            for (let i = 0; i < chunkSize; i++) {
-                for (let j = 0; j < chunkSize; j++) {
-                    const worldX = i + x * chunkSize;
-                    const worldZ = j + z * chunkSize;
-                    const height = Math.sin(worldX * 0.1) * Math.cos(worldZ * 0.1) * 10; // Example terrain height function
+    const textureLoader = new THREE.TextureLoader();
+    const textures = {
+      stone: textureLoader.load('blob:chrome-untrusted://media-app/a56eaf18-3c2a-4ef5-b597-42ff765b403c'),
+      coal: textureLoader.load('blob:chrome-untrusted://media-app/5cea07b6-cab2-4a8f-9e7d-223814108e56'),
+      iron: textureLoader.load('blob:chrome-untrusted://media-app/20a33b4f-8619-430b-b3b0-4a19d83b4202'),
+      diamond: textureLoader.load('blob:chrome-untrusted://media-app/31cc671b-0b82-47a5-ac69-727c9a4a9f0f'),
+      grass: textureLoader.load('blob:chrome-untrusted://media-app/bcc3e8a9-be87-4720-8412-d83391976ed5')
+    };
 
-                    const block = createBlockWithLOD(worldX, height, worldZ);
-                    chunk.add(block);
-                }
+    const blockSize = 1;
+
+    function createBlock(x, y, z, type) {
+      const geometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
+      const material = new THREE.MeshStandardMaterial({ map: textures[type] });
+      const block = new THREE.Mesh(geometry, material);
+      block.position.set(x, y, z);
+      scene.add(block);
+      return block;
+    }
+
+    function generateChunk(xOffset, zOffset) {
+      for (let x = 0; x < 16; x++) {
+        for (let z = 0; z < 16; z++) {
+          let topY = 15;
+          for (let y = 0; y <= topY; y++) {
+            const worldX = x + xOffset;
+            const worldZ = z + zOffset;
+            let type = 'stone';
+            if (y === topY) {
+              type = 'grass';
+            } else if (y < 4 && Math.random() < 0.02) {
+              type = 'diamond';
+            } else if (y < 8 && Math.random() < 0.1) {
+              type = 'iron';
+            } else if (Math.random() < 0.3) {
+              type = 'coal';
             }
-
-            return chunk;
+            createBlock(worldX, y, worldZ, type);
+          }
         }
+      }
+    }
 
-        // Create block with LOD
-        function createBlockWithLOD(x, y, z) {
-            const lowDetail = new THREE.BoxGeometry(1, 1, 1);  // Basic box for far distances
-            const highDetail = new THREE.CylinderGeometry(1, 1, 1, 6);  // More detailed model for nearby
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(100, 100, 100);
+    scene.add(light);
 
-            const lowMaterial = new THREE.MeshBasicMaterial({ map: textureGrass });
-            const highMaterial = new THREE.MeshBasicMaterial({ map: textureWood });
+    const entities = {
+      friendly: [blob:chrome-untrusted://media-app/0b8a77da-48c2-4715-a80a-ca5035c0039e],
+      hostile: [blob:chrome-untrusted://media-app/77db7fdb-33fc-4c74-b8cf-8c6573816781]
+    };
 
-            const lowBlock = new THREE.Mesh(lowDetail, lowMaterial);
-            const highBlock = new THREE.Mesh(highDetail, highMaterial);
+    function spawnEntity(type, x, y, z) {
+      const color = type === 'friendly' ? 0x00ff00 : 0xff0000;
+      const geometry = new THREE.SphereGeometry(0.5, 16, 16);
+      const material = new THREE.MeshStandardMaterial({ color });
+      const entity = new THREE.Mesh(geometry, material);
+      entity.position.set(x, y, z);
+      scene.add(entity);
+      entities[type].push(entity);
+    }
 
-            const lod = new THREE.LOD();
-            lod.addLevel(lowBlock, 100);   // Low detail at 100 units away
-            lod.addLevel(highBlock, 30);   // High detail at 30 units away
+    let craftingMenuVisible = false;
+    const craftingMenu = document.createElement('div');
+    craftingMenu.style.position = 'absolute';
+    craftingMenu.style.top = '20px';
+    craftingMenu.style.left = '20px';
+    craftingMenu.style.padding = '10px';
+    craftingMenu.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+    craftingMenu.style.color = '#fff';
+    craftingMenu.style.display = 'none';
+    craftingMenu.innerHTML = `Press E to open/close this menu<br><br>Pickaxe Recipe: <br>3x Stone (top row)<br>2x Sticks (center of mid and bottom row)`;
+    document.body.appendChild(craftingMenu);
 
-            lod.position.set(x, y, z);
-            return lod;
-        }
+    window.addEventListener('keydown', (e) => {
+      if (e.key.toLowerCase() === 'e') {
+        craftingMenuVisible = !craftingMenuVisible;
+        craftingMenu.style.display = craftingMenuVisible ? 'block' : 'none';
+      }
+    });
 
-        // Chunk Management - Load and Unload Chunks Dynamically
-        function distanceBetween(x1, z1, x2, z2) {
-            return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(z2 - z1, 2));
-        }
+    generateChunk(0, 0);
 
-        function getChunkCoordinates(playerX, playerZ) {
-            return { x: Math.floor(playerX / chunkSize), z: Math.floor(playerZ / chunkSize) };
-        }
+    function gameLoop() {
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(gameLoop);
+    }
 
-        function loadChunk(x, z) {
-            const chunk = generateChunk(x, z);
-            loadedChunks.push({ chunk, x, z });
-            scene.add(chunk);  // Add chunk to the scene
-        }
-
-        function unloadChunk(x, z) {
-            const chunkIndex = loadedChunks.findIndex(chunkData => chunkData.x === x && chunkData.z === z);
-            if (chunkIndex !== -1) {
-                const chunk = loadedChunks[chunkIndex].chunk;
-                scene.remove(chunk);  // Remove chunk from the scene
-                loadedChunks.splice(chunkIndex, 1);  // Remove from loaded chunks
-            }
-        }
-
-        function updateChunks(playerX, playerZ) {
-            const { x, z } = getChunkCoordinates(playerX, playerZ);
-
-            // Load new chunks
-            for (let dx = -loadDistance; dx <= loadDistance; dx++) {
-                for (let dz = -loadDistance; dz <= loadDistance; dz++) {
-                    const chunkX = x + dx;
-                    const chunkZ = z + dz;
-
-                    if (!loadedChunks.some(chunkData => chunkData.x === chunkX && chunkData.z === chunkZ)) {
-                        loadChunk(chunkX, chunkZ);
-                    }
-                }
-            }
-
-            // Unload distant chunks
-            loadedChunks.forEach(chunkData => {
-                const distance = distanceBetween(chunkData.x, chunkData.z, x, z);
-                if (distance > loadDistance) {
-                    unloadChunk(chunkData.x, chunkData.z);
-                }
-            });
-        }
-
-        // Movement Controls (WASD)
-        const moveSpeed = 1;
-        let keys = {};
-
-        window.addEventListener("keydown", (event) => {
-            keys[event.key] = true;
-        });
-
-        window.addEventListener("keyup", (event) => {
-            keys[event.key] = false;
-        });
-
-        function updateCameraPosition() {
-            if (keys['w']) camera.position.z -= moveSpeed;
-            if (keys['s']) camera.position.z += moveSpeed;
-            if (keys['a']) camera.position.x -= moveSpeed;
-            if (keys['d']) camera.position.x += moveSpeed;
-        }
-
-        // Game loop
-        let playerPosition = { x: 0, y: 50, z: 0 };
-        function gameLoop() {
-            updateCameraPosition();
-            updateChunks(playerPosition.x, playerPosition.z);  // Update chunks based on player position
-
-            renderer.render(scene, camera);
-            requestAnimationFrame(gameLoop);
-        }
-
-        // Start the game loop
-        gameLoop();
-
-    </script>
+    gameLoop();
+  </script>
 </body>
 </html>
-
